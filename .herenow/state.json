@@ -1,0 +1,10 @@
+{
+  "publishes": {
+    "holy-anchor-6hbt": {
+      "siteUrl": "https://holy-anchor-6hbt.here.now/",
+      "claimToken": "034cfa330b5c6cb4679fe7164f9fde16253d0817aed7e4fcb04cfa9eb2f19ed2",
+      "claimUrl": "https://here.now/claim?slug=holy-anchor-6hbt&token=034cfa330b5c6cb4679fe7164f9fde16253d0817aed7e4fcb04cfa9eb2f19ed2",
+      "expiresAt": "2026-03-25T20:05:26.816Z"
+    }
+  }
+}

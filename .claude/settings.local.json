@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:holy-anchor-6hbt.here.now)",
+      "Bash(gh auth:*)"
+    ]
+  }
+}
