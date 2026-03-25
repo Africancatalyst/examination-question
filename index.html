@@ -847,16 +847,40 @@ function parseCSV(text) {
 function mapCSVRowToStudent(headerRow, dataRow) {
   const map = {};
   const h = headerRow.map(v => v.toLowerCase().trim());
+  const usedIndexes = new Set();
   CSV_COLUMNS.forEach(col => {
     const hLower = col.header.toLowerCase();
-    // Match by exact header or by key
+    // Match by exact header
     let idx = h.indexOf(hLower);
-    if (idx < 0) idx = h.findIndex(hh => hh.includes(col.key.replace(/\d/, '')) || hh.startsWith(col.key));
-    // Fallback: fuzzy match on main word
+    // Fallback: match by key exactly (e.g. "fee1", "paid2")
+    if (idx < 0) idx = h.indexOf(col.key.toLowerCase());
+    // Fallback: match header containing the full key (e.g. "fee1" in "fee1 amount")
+    if (idx < 0) idx = h.findIndex((hh, i) => !usedIndexes.has(i) && hh.includes(col.key));
+    // Fallback: for numbered keys like fee1/paid2, match by keyword + number
+    if (idx < 0) {
+      const numMatch = col.key.match(/^([a-z]+)(\d+)$/);
+      if (numMatch) {
+        const [, keyword, num] = numMatch;
+        idx = h.findIndex((hh, i) => !usedIndexes.has(i) && hh.includes(keyword) && hh.includes(num));
+        // Last resort: find Nth column containing the keyword
+        if (idx < 0) {
+          const n = parseInt(num);
+          let count = 0;
+          idx = h.findIndex((hh, i) => {
+            if (usedIndexes.has(i) || !hh.includes(keyword)) return false;
+            return ++count === n;
+          });
+        }
+      }
+    }
+    // Fallback for non-numbered keys: match by keyword
     if (idx < 0) {
       const keyword = col.key.replace(/\d+/, '');
-      idx = h.findIndex(hh => hh.includes(keyword));
+      if (keyword === col.key) { // only if key has no digits
+        idx = h.findIndex((hh, i) => !usedIndexes.has(i) && hh.includes(keyword));
+      }
     }
+    if (idx >= 0) usedIndexes.add(idx);
     map[col.key] = idx >= 0 && idx < dataRow.length ? dataRow[idx] : '';
   });
   // Also check for a Route column
@@ -920,7 +944,7 @@ async function importRouteCSV(event, routeKey) {
   if (rows.length < 2) { toast('CSV file is empty or has no data rows', 'error'); return; }
 
   const headerRow = rows[0];
-  let added = 0, skipped = 0;
+  let added = 0, skipped = 0, lastErr = '';
 
   for (let i = 1; i < rows.length; i++) {
     const mapped = mapCSVRowToStudent(headerRow, rows[i]);
@@ -946,11 +970,13 @@ async function importRouteCSV(event, routeKey) {
       const result = await supaInsert('students', data);
       students.push(result[0]);
       added++;
-    } catch(e) { skipped++; }
+    } catch(e) { skipped++; console.error('CSV import row error:', e.message, data); lastErr = e.message; }
   }
 
   buildTabs(); renderCurrentTab();
-  toast(`Imported ${added} student${added !== 1 ? 's' : ''}${skipped ? `, ${skipped} skipped` : ''}`);
+  let msg = `Imported ${added} student${added !== 1 ? 's' : ''}${skipped ? `, ${skipped} skipped` : ''}`;
+  if (skipped && lastErr) msg += ` (${lastErr})`;
+  toast(msg, added > 0 ? 'success' : 'error');
 }
 
 // --- Import CSV from header (auto-detect route from CSV or prompt) ---
@@ -964,7 +990,7 @@ async function importCSVFromHeader(event) {
 
   const headerRow = rows[0];
   const hasRouteCol = headerRow.some(h => h.toLowerCase().trim() === 'route');
-  let added = 0, skipped = 0;
+  let added = 0, skipped = 0, lastErr = '';
 
   for (let i = 1; i < rows.length; i++) {
     const mapped = mapCSVRowToStudent(headerRow, rows[i]);
@@ -1006,11 +1032,13 @@ async function importCSVFromHeader(event) {
       const result = await supaInsert('students', data);
       students.push(result[0]);
       added++;
-    } catch(e) { skipped++; }
+    } catch(e) { skipped++; console.error('CSV import row error:', e.message, data); lastErr = e.message; }
   }
 
   buildTabs(); renderCurrentTab();
-  toast(`Imported ${added} student${added !== 1 ? 's' : ''}${skipped ? `, ${skipped} skipped` : ''}`);
+  let msg = `Imported ${added} student${added !== 1 ? 's' : ''}${skipped ? `, ${skipped} skipped` : ''}`;
+  if (skipped && lastErr) msg += ` (${lastErr})`;
+  toast(msg, added > 0 ? 'success' : 'error');
 }
 
 // ================================================================
